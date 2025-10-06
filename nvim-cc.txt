@@ -1,0 +1,1 @@
+c++ main.cpp window.cpp -o main -lm -l:libraylib.a -L./raylib5.5/lib && ./main
