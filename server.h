@@ -13,8 +13,8 @@ class Server {
         const char * ip;
         int port;
 
-        int server_fd, epoll_fd;
-        std::vector<epoll_event> events;
+        int server_fd, udp_fd, epoll_fd;
+        epoll_event events[10];
 
         Server(const char *ip, int port);
         ~Server();
