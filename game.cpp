@@ -21,6 +21,7 @@ Game::Game(void *w) {
 
     auto pptr = std::make_shared<Player>(CONTROLLABLE_PLAYER);
     pptr->col = GetColor(0x1e1e2eff);
+    this->p1 = pptr;
 
     if (!emptyCells.empty()) {
         auto [i, j] = emptyCells[rand() % emptyCells.size()];

@@ -46,16 +46,17 @@ bool Client::connect_to_server() {
     }
 
     // TCP
-    // TODO: TCP send request to the server to get the id
-    const char *msg = "Hello";
+    int id;
+    const char *msg = "id";
     Game *game = (Game *)this->game;
     if (send(socktcp, (void *)msg, strlen(msg), 0) < 0) {
         perror("send failed");
-    } else {
-        std::cout << "sended " << msg << std::endl;
     }
+    ssize_t len = recv(socktcp, &id, sizeof(id), 0);
+    if (len == sizeof(id)) game->p1->id = ntohl(id);
     return true;
 }
+
 void Client::loop() {
     Game *game = (Game *)this->game;
     for (;;) {
@@ -64,23 +65,12 @@ void Client::loop() {
         UdpData msg = {0};
         if (game->p1) {
             msg.pos = { game->p1->rec.x, game->p1->rec.y };
+            msg.id = game->p1->id;
             if (send(sockudp, (void *)&msg, sizeof(msg), 0) < 0) {
                 perror("send failed");
             }
         }
         usleep(200000);
     }
-
-    // char buf[1024];
-    // ssize_t len = recv(sockfd, buf, sizeof(buf) - 1, 0);
-    // if (len > 0) {
-    //     buf[len] = '\0';
-    //     std::cout << "Received: " << buf << std::endl;
-    // } else if (len == 0) {
-    //     std::cout << "No data received" << std::endl;
-    // } else {
-    //     perror("recv failed");
-    // }
-
     close(sockudp);
 }

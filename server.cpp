@@ -1,10 +1,13 @@
+#include <cstring>
 #include <iostream>
+#include <algorithm>
 #include <unistd.h>
 #include <arpa/inet.h>
 #include <fcntl.h>
 #include <sys/epoll.h>
 
 #include "server.h"
+#include "data.h"
 
 Server::Server(const char *ip, int port) {
     this->ip = ip;
@@ -116,38 +119,66 @@ void Server::_start_loop() {
                     std::cout << "[TCP] New client connected, fd=" << client_fd << "\n";
                 }
             } else if (fd == udp_fd) {
-                // --- UDP: handle datagram ---
                 sockaddr_in client_addr{};
                 socklen_t addr_len = sizeof(client_addr);
-                char buffer[1024] = {0};
+                UdpData data{};
 
-                ssize_t len = recvfrom(udp_fd, buffer, sizeof(buffer) - 1, 0,
-                                       (sockaddr*)&client_addr, &addr_len);
-                if (len > 0) {
-                    buffer[len] = '\0';
+                ssize_t len = recvfrom(udp_fd, &data, sizeof(data), 0,
+                        (sockaddr*)&client_addr, &addr_len);
+                if (len == sizeof(UdpData)) {
+                    // Convert position to host byte order if needed (optional, for cross-endian)
+                    // data.id = ntohl(data.id);
+
                     char client_ip[INET_ADDRSTRLEN];
                     inet_ntop(AF_INET, &client_addr.sin_addr, client_ip, sizeof(client_ip));
                     std::cout << "[UDP] From " << client_ip << ":" << ntohs(client_addr.sin_port)
-                              << " -> " << buffer;
+                        << " id=" << data.id
+                        << " pos=(" << data.pos.x << ", " << data.pos.y << ")\n";
 
-                    // Echo reply
-                    std::string reply = "Echo(UDP): " + std::string(buffer);
-                    sendto(udp_fd, reply.c_str(), reply.size(), 0,
-                           (sockaddr*)&client_addr, addr_len);
+                    // --- Store client address if new ---
+                    bool known = false;
+                    for (auto &c : udp_clients) {
+                        if (c.sin_addr.s_addr == client_addr.sin_addr.s_addr &&
+                                c.sin_port == client_addr.sin_port) {
+                            known = true;
+                            break;
+                        }
+                    }
+                    if (!known) {
+                        udp_clients.push_back(client_addr);
+                        std::cout << "[UDP] New client tracked (" << client_ip << ")\n";
+                    }
+
+                    // --- Broadcast the received data to everyone (including sender for now) ---
+                    for (auto &c : udp_clients) {
+                        sendto(udp_fd, &data, sizeof(data), 0,
+                                (sockaddr*)&c, sizeof(c));
+                    }
                 }
+
             } else {
                 // --- TCP: existing client ---
                 char buffer[1024] = {0};
                 ssize_t count = read(fd, buffer, sizeof(buffer) - 1);
                 if (count <= 0) {
+                    // TODO: Cleanup the stuff when disconnected
+                    auto it = std::find(this->pid.begin(), this->pid.end(), fd);
+                    if (it != this->pid.end()) {
+                        this->pid.erase(it);
+                        std::cout << "[TCP] Removed fd " << fd << " from pid list\n";
+                    }
                     std::cout << "[TCP] Client disconnected, fd=" << fd << "\n";
                     epoll_ctl(epoll_fd, EPOLL_CTL_DEL, fd, nullptr);
                     close(fd);
                 } else {
                     buffer[count] = '\0';
-                    std::cout << "[TCP] Client " << fd << ": " << buffer << std::endl;
-                    // std::string reply = "Echo(TCP): " + std::string(buffer);
-                    // send(fd, reply.c_str(), reply.size(), 0);
+                    if (strncmp(buffer, "id", 2) == 0) {
+                        int id = this->pid.size();
+                        this->pid.push_back(fd);
+                        int net_id = htonl(id);
+                        send(fd, &net_id, sizeof(net_id), 0);
+                        std::cout << "[TCP] Assigned id " << id << " to fd " << fd << "\n";
+                    }
                 }
             }
         }

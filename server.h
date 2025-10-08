@@ -15,7 +15,8 @@ class Server {
 
         int server_fd, udp_fd, epoll_fd;
         epoll_event events[10];
-        int pid[2];
+        std::vector<int> pid;
+        std::vector<sockaddr_in> udp_clients;
 
         Server(const char *ip, int port);
         ~Server();
