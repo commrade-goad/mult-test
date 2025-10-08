@@ -1,15 +1,21 @@
 #include "client.h"
 #include "data.h"
 #include "game.h"
+#include "id.h"
 
 #include <arpa/inet.h>
 #include <unistd.h>
+#include <fcntl.h>
 #include <cstring>
 #include <iostream>
 
-Client::~Client() { close(this->sockudp); }
+Client::~Client() {
+    close(this->sockudp);
+    close(this->socktcp);
+}
+
 bool Client::connect_to_server() {
-    // UDP
+    // --- UDP ---
     sockudp = socket(AF_INET, SOCK_DGRAM, 0);
     if (sockudp < 0) {
         perror("socket failed");
@@ -27,7 +33,11 @@ bool Client::connect_to_server() {
         return false;
     }
 
-    // TCP
+    // make UDP non-blocking
+    int flags = fcntl(sockudp, F_GETFL, 0);
+    fcntl(sockudp, F_SETFL, flags | O_NONBLOCK);
+
+    // --- TCP ---
     socktcp = socket(AF_INET, SOCK_STREAM, 0);
     if (socktcp < 0) {
         perror("socket failed");
@@ -45,32 +55,79 @@ bool Client::connect_to_server() {
         return false;
     }
 
-    // TCP
+    // --- Request ID ---
     int id;
     const char *msg = "id";
     Game *game = (Game *)this->game;
-    if (send(socktcp, (void *)msg, strlen(msg), 0) < 0) {
+    if (send(socktcp, msg, strlen(msg), 0) < 0) {
         perror("send failed");
     }
+
     ssize_t len = recv(socktcp, &id, sizeof(id), 0);
     if (len == sizeof(id)) game->p1->id = ntohl(id);
+
     return true;
 }
 
 void Client::loop() {
     Game *game = (Game *)this->game;
+
     for (;;) {
         if (game->exit) break;
 
-        UdpData msg = {0};
+        // --- Send position ---
         if (game->p1) {
-            msg.pos = { game->p1->rec.x, game->p1->rec.y };
+            UdpData msg{};
             msg.id = game->p1->id;
-            if (send(sockudp, (void *)&msg, sizeof(msg), 0) < 0) {
-                perror("send failed");
+            msg.pos = { game->p1->rec.x, game->p1->rec.y };
+            if (send(sockudp, &msg, sizeof(msg), 0) < 0) {
+                perror("UDP send failed");
             }
         }
-        usleep(200000);
+
+        // --- Receive updates ---
+        for (;;) {
+            UdpData recv_msg{};
+            ssize_t len = recv(sockudp, &recv_msg, sizeof(recv_msg), 0);
+            if (len <= 0) break;
+
+            if (len == sizeof(UdpData)) {
+                if (recv_msg.id == game->p1->id) continue;
+
+                std::shared_ptr<Player> found = nullptr;
+                for (auto &o : game->obs) {
+                    auto p = std::dynamic_pointer_cast<Player>(o);
+                    if (p && p->id == recv_msg.id) {
+                        found = p;
+                        break;
+                    }
+                }
+
+                if (!found) {
+                    auto pptr = std::make_shared<Player>(PLAYER);
+                    pptr->col = GetColor(0x1e1e2eff);
+                    pptr->id = recv_msg.id;
+                    pptr->rec = { recv_msg.pos.x, recv_msg.pos.y,
+                        static_cast<float>(game->tile_size), static_cast<float>(game->tile_size) };
+                    game->obs.push_back(pptr);
+                    std::cout << "[UDP] New player " << recv_msg.id
+                        << " created at (" << recv_msg.pos.x << ", " << recv_msg.pos.y << ")\n";
+                } else {
+                    // found->rec.x = recv_msg.pos.x;
+                    // found->rec.y = recv_msg.pos.y;
+
+                    found->rec.x += (recv_msg.pos.x - found->rec.x) * 0.2f;
+                    found->rec.y += (recv_msg.pos.y - found->rec.y) * 0.2f;
+                }
+
+                std::cout << "[UDP] id=" << recv_msg.id
+                          << " pos=(" << recv_msg.pos.x << ", " << recv_msg.pos.y << ")\n";
+            }
+        }
+
+        usleep(16000);
     }
+
     close(sockudp);
+    close(socktcp);
 }

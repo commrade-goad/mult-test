@@ -10,6 +10,7 @@ class Player : public Obj {
         float max_speed = 200.0f;
         float accel_rate = 900.0f;
         float friction = 800.0f;
+        int pid;
 
         Player(int id) : Obj(id) {}
         void draw() { DrawRectangleRec(this->rec, this->col); }

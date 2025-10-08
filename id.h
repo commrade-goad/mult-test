@@ -2,6 +2,6 @@
 
 enum ObId : int {
     CONTROLLABLE_PLAYER = 0,
-    PLAYER,
+    PLAYER = 1,
     BOMB
 };
