@@ -4,6 +4,8 @@
 
 #include <arpa/inet.h>
 #include <unistd.h>
+#include <cstring>
+#include <iostream>
 
 Client::~Client() { close(this->sockudp); }
 bool Client::connect_to_server() {
@@ -43,6 +45,15 @@ bool Client::connect_to_server() {
         return false;
     }
 
+    // TCP
+    // TODO: TCP send request to the server to get the id
+    const char *msg = "Hello";
+    Game *game = (Game *)this->game;
+    if (send(socktcp, (void *)msg, strlen(msg), 0) < 0) {
+        perror("send failed");
+    } else {
+        std::cout << "sended " << msg << std::endl;
+    }
     return true;
 }
 void Client::loop() {

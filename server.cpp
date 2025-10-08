@@ -145,9 +145,9 @@ void Server::_start_loop() {
                     close(fd);
                 } else {
                     buffer[count] = '\0';
-                    std::cout << "[TCP] Client " << fd << ": " << buffer;
-                    std::string reply = "Echo(TCP): " + std::string(buffer);
-                    send(fd, reply.c_str(), reply.size(), 0);
+                    std::cout << "[TCP] Client " << fd << ": " << buffer << std::endl;
+                    // std::string reply = "Echo(TCP): " + std::string(buffer);
+                    // send(fd, reply.c_str(), reply.size(), 0);
                 }
             }
         }
