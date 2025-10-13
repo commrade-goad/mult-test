@@ -21,7 +21,6 @@ Server::~Server() {
 }
 
 void Server::start() {
-    // === TCP socket setup ===
     this->server_fd = socket(AF_INET, SOCK_STREAM, 0);
     if (this->server_fd == -1) {
         perror("TCP socket");
@@ -51,7 +50,6 @@ void Server::start() {
     int flags = fcntl(this->server_fd, F_GETFL, 0);
     fcntl(this->server_fd, F_SETFL, flags | O_NONBLOCK);
 
-    // === UDP socket setup ===
     this->udp_fd = socket(AF_INET, SOCK_DGRAM, 0);
     if (this->udp_fd == -1) {
         perror("UDP socket");
@@ -103,7 +101,6 @@ void Server::_start_loop() {
             int fd = events[i].data.fd;
 
             if (fd == server_fd) {
-                // --- TCP: accept new client ---
                 sockaddr_in client_addr{};
                 socklen_t client_len = sizeof(client_addr);
                 int client_fd = accept(server_fd, (sockaddr*)&client_addr, &client_len);
@@ -126,7 +123,6 @@ void Server::_start_loop() {
                 ssize_t len = recvfrom(udp_fd, &data, sizeof(data), 0,
                         (sockaddr*)&client_addr, &addr_len);
                 if (len == sizeof(UdpData)) {
-                    // Convert position to host byte order if needed (optional, for cross-endian)
                     // data.id = ntohl(data.id);
 
                     char client_ip[INET_ADDRSTRLEN];
@@ -135,7 +131,6 @@ void Server::_start_loop() {
                         << " id=" << data.id
                         << " pos=(" << data.pos.x << ", " << data.pos.y << ")\n";
 
-                    // --- Store client address if new ---
                     bool known = false;
                     for (auto &c : udp_clients) {
                         if (c.sin_addr.s_addr == client_addr.sin_addr.s_addr &&
@@ -149,7 +144,6 @@ void Server::_start_loop() {
                         std::cout << "[UDP] New client tracked (" << client_ip << ")\n";
                     }
 
-                    // --- Broadcast the received data to everyone (including sender for now) ---
                     for (auto &c : udp_clients) {
                         sendto(udp_fd, &data, sizeof(data), 0,
                                 (sockaddr*)&c, sizeof(c));
@@ -157,7 +151,6 @@ void Server::_start_loop() {
                 }
 
             } else {
-                // --- TCP: existing client ---
                 char buffer[1024] = {0};
                 ssize_t count = read(fd, buffer, sizeof(buffer) - 1);
                 if (count <= 0) {

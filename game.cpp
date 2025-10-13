@@ -83,19 +83,16 @@ void Game::logic(float dt) {
     p1->rec.x += p1->velocity.x * dt;
     p1->rec.y += p1->velocity.y * dt;
 
-    // Get window information to adjust tile calculations
     Window *win = (Window *)this->w;
     int map_pixel_width = tile_size * MAP_WIDTH;
     int map_pixel_height = tile_size * MAP_HEIGHT;
     int offset_x = (win->w - map_pixel_width) / 2;
     int offset_y = (win->h - map_pixel_height) / 2;
 
-    // Convert player position to map coordinates
     int playerTileX = (int)((p1->rec.x - offset_x) / this->tile_size);
     int playerTileY = (int)((p1->rec.y - offset_y) / this->tile_size);
     bool collided = false;
 
-    // Check for collision only with nearby tiles (in a 3x3 grid around player)
     const int CHECK_RADIUS = 1; // Check 1 tile in each direction
 
     for (int y = playerTileY - CHECK_RADIUS; y <= playerTileY + CHECK_RADIUS; y++) {
@@ -106,7 +103,6 @@ void Game::logic(float dt) {
 
             // Check if this tile is solid/collidable
             if (this->map[y][x]) { // 1 = solid, 0 = empty
-                // Create rectangle for this tile with proper offset
                 Rectangle tileRect = {
                     (float)(offset_x + x * this->tile_size),
                     (float)(offset_y + y * this->tile_size),
@@ -114,7 +110,6 @@ void Game::logic(float dt) {
                     (float)this->tile_size
                 };
 
-                // Check collision between player and this tile
                 if (CheckCollisionRecs(p1->rec, tileRect)) {
                     collided = true;
                     break;

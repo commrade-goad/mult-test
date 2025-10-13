@@ -25,7 +25,6 @@ int main(int argc, char **argv) {
         }
     }
     if (!server) {
-        // TODO: Send tcp to server to get the id
         Window w(1280, 720, "hello");
         Client c(ip.c_str(), port, (void *)&w.g);
         c.connect_to_server();
